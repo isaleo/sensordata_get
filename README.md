@@ -1,6 +1,9 @@
 # sensordata_get
 get sensor data from device via adb forward socket
 
+Tools:
+Android Studio 4.1.2
+
 ./server
 Server code, an android studio project, compiled on pc, and run on device
 
