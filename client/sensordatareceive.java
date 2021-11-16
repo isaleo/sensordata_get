@@ -87,23 +87,23 @@ public class sensordatareceive {
             new Thread(){
                 @Override
                 public void run() {
+					float acc_x = 0, acc_y = 0, acc_z = 0;
+					long ts = 0;
+
                     super.run();
 					while(true){
 						try {
-							float acc_x = 0, acc_y = 0, acc_z = 0;
-							long ts = 0;
-							diss.read(buffer);
-							acc_x = byte2float(buffer, 0);
-							acc_y = byte2float(buffer, 4);
-							acc_z = byte2float(buffer, 8);
-							//System.out.format("buffer: %#x%x%x%x%x%x%x%x\n",buffer[19], buffer[18], buffer[17], buffer[16], buffer[15], buffer[14], buffer[13], buffer[12]);
-							ts = bytes2long(buffer, 12);
-							
-							Thread.sleep(1);
+							int len = 0;
+							len = diss.read(buffer);
+							if (len > 0) {
+								acc_x = byte2float(buffer, 0);
+								acc_y = byte2float(buffer, 4);
+								acc_z = byte2float(buffer, 8);
+								//System.out.format("buffer: %#x%x%x%x%x%x%x%x\n",buffer[19], buffer[18], buffer[17], buffer[16], buffer[15], buffer[14], buffer[13], buffer[12]);
+								ts = bytes2long(buffer, 12);
 
-							System.out.println("acc_x:"+ acc_x +" acc_y:"+ acc_y +" acc_z:"+ acc_z + " ts:" + ts);
-						} catch (InterruptedException e) {
-							System.out.println("InterruptedException: " + e);
+								System.out.println("acc_x:"+ acc_x +" acc_y:"+ acc_y +" acc_z:"+ acc_z + " ts:" + ts);
+							}
 						} catch (IOException e) {
 							System.out.println("IOException: " + e);
 						}

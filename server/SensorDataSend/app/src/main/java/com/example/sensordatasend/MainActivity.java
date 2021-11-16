@@ -12,6 +12,7 @@ import android.os.StrictMode;
 import android.util.Log;
 
 
+import java.io.DataInputStream;
 import java.util.*;
 
 import java.io.DataOutputStream;
@@ -30,6 +31,8 @@ public class MainActivity extends AppCompatActivity {
     Socket mClientSocket;
     SensorManager sensorManager;
     private ReadWriteLock rwl = new ReentrantReadWriteLock();
+    DataOutputStream outputStream;
+    byte[] buffer = new byte[60];
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,7 +44,8 @@ public class MainActivity extends AppCompatActivity {
             StrictMode.setThreadPolicy(policy);
         }
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        SendSensorData();
+        initServer();
+        sendData();
     }
 
     public static byte[] float2byte(float f) {
@@ -91,18 +95,93 @@ public class MainActivity extends AppCompatActivity {
         return buffer.getLong();
     }
 
-    private void SendSensorData() {
-        Log.e(TAG, "SendSensorData enter");
+    private void sendData() {
+        class SensorEventListenerT implements SensorEventListener {
+            @Override
+            synchronized
+            public void onSensorChanged(SensorEvent event) {
+                float acc_x = 0, acc_y = 0, acc_z = 0;
+                float gyro_x = 0, gyro_y = 0, gyro_z = 0;
+                float mag_x = 0, mag_y = 0, mag_z = 0;
+                long ts = 0;
+
+                rwl.writeLock().lock();
+                if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+                    Arrays.fill(buffer, 0, 19, (byte) 0);
+                    acc_x = event.values[0];
+                    acc_y = event.values[1];
+                    acc_z = event.values[2];
+                    ts = event.timestamp;
+
+                    System.out.println("acc_x="+acc_x+" acc_y="+acc_y+" acc_z="+acc_z+" ts="+ts);
+
+                    System.arraycopy(float2byte(acc_x), 0, buffer, 0, 4);
+                    System.arraycopy(float2byte(acc_y), 0, buffer, 4, 4);
+                    System.arraycopy(float2byte(acc_z), 0, buffer, 8, 4);
+                    System.arraycopy(long2byte(ts), 0, buffer, 12, 8);
+//                        System.out.format("buffer1: %#x%x%x%x%x%x%x%x\n",buffer[19], buffer[18], buffer[17], buffer[16], buffer[15], buffer[14], buffer[13], buffer[12]);
+                } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
+                    Arrays.fill(buffer, 20, 39, (byte) 0);
+                    gyro_x = event.values[0];
+                    gyro_y = event.values[1];
+                    gyro_z = event.values[2];
+                    ts = event.timestamp;
+                    System.out.println("gyro_x="+gyro_x+" gyro_y="+gyro_y+" gyro_z="+gyro_z+" ts="+ts);
+                    System.arraycopy(float2byte(gyro_x), 0, buffer, 20, 4);
+                    System.arraycopy(float2byte(gyro_y), 0, buffer, 24, 4);
+                    System.arraycopy(float2byte(gyro_z), 0, buffer, 28, 4);
+                    System.arraycopy(long2byte(ts), 0, buffer, 32, 8);
+                } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+                    Arrays.fill(buffer, 40, 59, (byte) 0);
+                    mag_x = event.values[0];
+                    mag_y = event.values[1];
+                    mag_z = event.values[2];
+                    ts = event.timestamp;
+                    System.out.println("mag_x="+mag_x+" mag_y="+mag_y+" mag_z="+mag_z+" ts"+ts);
+                    System.arraycopy(float2byte(mag_x), 0, buffer, 40, 4);
+                    System.arraycopy(float2byte(mag_y), 0, buffer, 44, 4);
+                    System.arraycopy(float2byte(mag_z), 0, buffer, 48, 4);
+                    System.arraycopy(long2byte(ts), 0, buffer, 52, 4);
+                }
+
+                try {
+                    //System.out.format("buffer2: %#x%x%x%x%x%x%x%x\n",buffer[19], buffer[18], buffer[17], buffer[16], buffer[15], buffer[14], buffer[13], buffer[12]);
+                    outputStream.write(buffer, 0, 48);
+                } catch (IOException e) {
+                    Log.e(TAG, "IOException " + e);
+                }
+                rwl.writeLock().unlock();
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+            }
+        };
+
+        SensorEventListenerT sensorEventListener = new SensorEventListenerT();
+
+        sensorManager.registerListener(sensorEventListener, sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+                SensorManager.SENSOR_DELAY_FASTEST);
+    }
+
+    private void initServer() {
+        Log.e(TAG, "initServer");
+
         try {
             mServerSocket = new ServerSocket(9999);
-            byte[] buffer = new byte[60];
-            Arrays.fill(buffer, (byte) 0);
 
             Log.e(TAG, "Create socket");
             mClientSocket = mServerSocket.accept();
+        } catch (IOException e) {
+            Log.e(TAG, "Exception: " + e);
+        }
 
+        Arrays.fill(buffer, (byte) 0);
+
+        try {
             Log.e(TAG, "Create output stream");
-            DataOutputStream outputStream = new DataOutputStream(mClientSocket.getOutputStream());
+            outputStream = new DataOutputStream(mClientSocket.getOutputStream());
 
             Log.e(TAG, "Enumerating sensors");
             List<Sensor> sensorList = sensorManager.getSensorList(Sensor.TYPE_ALL);
@@ -110,93 +189,15 @@ public class MainActivity extends AppCompatActivity {
             for (Sensor sensor: sensorList ){
                 Log.e(TAG, "\tType: " + sensor.getStringType());
             }
+        } catch (IOException e) {
+            Log.e(TAG, "IOException: " + e);
+        }
 
-            class SensorEventListenerT implements SensorEventListener {
-                @Override
-                synchronized
-                public void onSensorChanged(SensorEvent event) {
-                    float acc_x = 0, acc_y = 0, acc_z = 0;
-                    float gyro_x = 0, gyro_y = 0, gyro_z = 0;
-                    float mag_x = 0, mag_y = 0, mag_z = 0;
-                    long ts = 0;
-
-                    rwl.writeLock().lock();
-                    if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-                        Arrays.fill(buffer, 0, 19, (byte) 0);
-                        acc_x = event.values[0];
-                        acc_y = event.values[1];
-                        acc_z = event.values[2];
-                        ts = event.timestamp;
-
-                        System.out.println("acc_x="+acc_x+" acc_y="+acc_y+" acc_z="+acc_z+" ts="+ts);
-
-                        System.arraycopy(float2byte(acc_x), 0, buffer, 0, 4);
-                        System.arraycopy(float2byte(acc_y), 0, buffer, 4, 4);
-                        System.arraycopy(float2byte(acc_z), 0, buffer, 8, 4);
-                        System.arraycopy(long2byte(ts), 0, buffer, 12, 8);
-//                        System.out.format("buffer1: %#x%x%x%x%x%x%x%x\n",buffer[19], buffer[18], buffer[17], buffer[16], buffer[15], buffer[14], buffer[13], buffer[12]);
-                    } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
-                        Arrays.fill(buffer, 20, 39, (byte) 0);
-                        gyro_x = event.values[0];
-                        gyro_y = event.values[1];
-                        gyro_z = event.values[2];
-                        ts = event.timestamp;
-                        System.out.println("gyro_x="+gyro_x+" gyro_y="+gyro_y+" gyro_z="+gyro_z+" ts="+ts);
-                        System.arraycopy(float2byte(gyro_x), 0, buffer, 20, 4);
-                        System.arraycopy(float2byte(gyro_y), 0, buffer, 24, 4);
-                        System.arraycopy(float2byte(gyro_z), 0, buffer, 28, 4);
-                        System.arraycopy(long2byte(ts), 0, buffer, 32, 8);
-                    } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-                        Arrays.fill(buffer, 40, 59, (byte) 0);
-                        mag_x = event.values[0];
-                        mag_y = event.values[1];
-                        mag_z = event.values[2];
-                        ts = event.timestamp;
-                        System.out.println("mag_x="+mag_x+" mag_y="+mag_y+" mag_z="+mag_z+" ts"+ts);
-                        System.arraycopy(float2byte(mag_x), 0, buffer, 40, 4);
-                        System.arraycopy(float2byte(mag_y), 0, buffer, 44, 4);
-                        System.arraycopy(float2byte(mag_z), 0, buffer, 48, 4);
-                        System.arraycopy(long2byte(ts), 0, buffer, 52, 4);
-                    }
-                    rwl.writeLock().unlock();
-                }
-
-                @Override
-                public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
-                }
-            };
-
-            SensorEventListenerT sensorEventListener = new SensorEventListenerT();
-
-            sensorManager.registerListener(sensorEventListener, sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
-                                    SensorManager.SENSOR_DELAY_FASTEST);
-
-            new Thread() {
-                @Override
-                public void run() {
-                    super.run();
-//                    Log.e(TAG, "Send sensor data");
-                    boolean run = true;
-                    while (run) {
-                        try {
-                            rwl.readLock().lock();
-//                            System.out.format("buffer2: %#x%x%x%x%x%x%x%x\n",buffer[19], buffer[18], buffer[17], buffer[16], buffer[15], buffer[14], buffer[13], buffer[12]);
-                            outputStream.write(buffer, 0, 48);
-                            rwl.readLock().unlock();
-                            Thread.sleep(1);
-                        } catch (IOException e) {
-                            Log.e(TAG, "IOException: " + e);
-                        } catch (InterruptedException e){
-                            Log.e(TAG, "InterruptedException: " + e);
-                        } finally {
-//                            run = false;
-                        }
-                    }
-                }
-            }.start();
-        }catch (IOException e) {
-            Log.e(TAG, "Exception: " + e);
+        Log.e(TAG, "Enumerating sensors");
+        List<Sensor> sensorList = sensorManager.getSensorList(Sensor.TYPE_ALL);
+        Log.e(TAG, "Sensors:");
+        for (Sensor sensor: sensorList ){
+            Log.e(TAG, "\tType: " + sensor.getStringType());
         }
     }
 }
