@@ -88,6 +88,8 @@ public class sensordatareceive {
                 @Override
                 public void run() {
 					float acc_x = 0, acc_y = 0, acc_z = 0;
+					float gyro_x = 0, gyro_y = 0, gyro_z = 0;
+					float mag_x = 0, mag_y = 0, mag_z = 0;
 					long ts = 0;
 
                     super.run();
@@ -103,6 +105,24 @@ public class sensordatareceive {
 								ts = bytes2long(buffer, 12);
 
 								System.out.println("acc_x:"+ acc_x +" acc_y:"+ acc_y +" acc_z:"+ acc_z + " ts:" + ts);
+
+								acc_x = byte2float(buffer, 20);
+								acc_y = byte2float(buffer, 24);
+								acc_z = byte2float(buffer, 28);
+								//System.out.format("buffer: %#x%x%x%x%x%x%x%x\n",buffer[39], buffer[38], buffer[37], buffer[36], buffer[35], buffer[34], buffer[33], buffer[32]);
+								ts = bytes2long(buffer, 32);
+
+								System.out.println("gyro_x:"+ acc_x +" gyro_y:"+ acc_y +" gyro_z:"+ acc_z + " ts:" + ts);
+
+								acc_x = byte2float(buffer, 40);
+								acc_y = byte2float(buffer, 44);
+								acc_z = byte2float(buffer, 48);
+								//System.out.format("buffer: %#x%x%x%x%x%x%x%x\n",buffer[59], buffer[58], buffer[57], buffer[56], buffer[55], buffer[54], buffer[53], buffer[52]);
+								ts = bytes2long(buffer, 52);
+
+								System.out.println("mag_x:"+ acc_x +" mag_y:"+ acc_y +" mag_z:"+ acc_z + " ts:" + ts);
+
+
 							}
 						} catch (IOException e) {
 							System.out.println("IOException: " + e);

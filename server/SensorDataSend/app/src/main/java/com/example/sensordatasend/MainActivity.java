@@ -80,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
         for (int ix = 0; ix < 8; ix++) {
             int offset = ix * 8;
             byteNum[ix] = (byte) ((num >> offset) & 0xff);
-//            System.out.format("byteNum[%d]:%#x ", ix, byteNum[ix]);
+            //System.out.format("byteNum[%d]:%#x ", ix, byteNum[ix]);
         }
         System.out.format("\n");
         return byteNum;
@@ -119,7 +119,7 @@ public class MainActivity extends AppCompatActivity {
                     System.arraycopy(float2byte(acc_y), 0, buffer, 4, 4);
                     System.arraycopy(float2byte(acc_z), 0, buffer, 8, 4);
                     System.arraycopy(long2byte(ts), 0, buffer, 12, 8);
-//                        System.out.format("buffer1: %#x%x%x%x%x%x%x%x\n",buffer[19], buffer[18], buffer[17], buffer[16], buffer[15], buffer[14], buffer[13], buffer[12]);
+                    //System.out.format("buffer1: %#x%x%x%x%x%x%x%x\n",buffer[19], buffer[18], buffer[17], buffer[16], buffer[15], buffer[14], buffer[13], buffer[12]);
                 } else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
                     Arrays.fill(buffer, 20, 39, (byte) 0);
                     gyro_x = event.values[0];
@@ -137,20 +137,22 @@ public class MainActivity extends AppCompatActivity {
                     mag_y = event.values[1];
                     mag_z = event.values[2];
                     ts = event.timestamp;
-                    System.out.println("mag_x="+mag_x+" mag_y="+mag_y+" mag_z="+mag_z+" ts"+ts);
+                    System.out.println("mag_x="+mag_x+" mag_y="+mag_y+" mag_z="+mag_z+" ts="+ts);
                     System.arraycopy(float2byte(mag_x), 0, buffer, 40, 4);
                     System.arraycopy(float2byte(mag_y), 0, buffer, 44, 4);
                     System.arraycopy(float2byte(mag_z), 0, buffer, 48, 4);
-                    System.arraycopy(long2byte(ts), 0, buffer, 52, 4);
+                    System.arraycopy(long2byte(ts), 0, buffer, 52, 8);
                 }
+                rwl.writeLock().unlock();
 
+                rwl.readLock().lock();
                 try {
                     //System.out.format("buffer2: %#x%x%x%x%x%x%x%x\n",buffer[19], buffer[18], buffer[17], buffer[16], buffer[15], buffer[14], buffer[13], buffer[12]);
-                    outputStream.write(buffer, 0, 48);
+                    outputStream.write(buffer, 0, 60);
                 } catch (IOException e) {
                     Log.e(TAG, "IOException " + e);
                 }
-                rwl.writeLock().unlock();
+                rwl.readLock().unlock();
             }
 
             @Override
@@ -162,6 +164,12 @@ public class MainActivity extends AppCompatActivity {
         SensorEventListenerT sensorEventListener = new SensorEventListenerT();
 
         sensorManager.registerListener(sensorEventListener, sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+                SensorManager.SENSOR_DELAY_FASTEST);
+
+        sensorManager.registerListener(sensorEventListener, sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE),
+                SensorManager.SENSOR_DELAY_FASTEST);
+
+        sensorManager.registerListener(sensorEventListener, sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD),
                 SensorManager.SENSOR_DELAY_FASTEST);
     }
 
